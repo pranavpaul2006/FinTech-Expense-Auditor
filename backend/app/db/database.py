@@ -59,6 +59,32 @@ def save_claim(receipt_data: dict, justification: str, audit_verdict: dict, empl
     conn.close()
     return claim_id 
 
+def get_all_claims():
+    """Fetches all claims from the database for the Auditor Dashboard."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row # This formats the rows as JSON dictionaries
+    cursor = conn.cursor()
+    # Sort them so the newest ones are at the top
+    cursor.execute("SELECT * FROM claims ORDER BY created_at DESC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+def update_claim_status(claim_id: int, new_status: str, comment: str):
+    """Allows a human auditor to override the AI and leave a comment."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        UPDATE claims 
+        SET human_status = ?, auditor_comment = ? 
+        WHERE id = ?
+    ''', (new_status, comment, claim_id))
+    
+    conn.commit()
+    conn.close()
+    return True
+
 
 if __name__ == "__main__":
     init_db()
