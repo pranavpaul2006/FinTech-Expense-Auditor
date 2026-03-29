@@ -2,8 +2,9 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
-# Import our new OCR service
+# Import our services
 from services.ocr_service import extract_receipt_data
+from services.audit_service import audit_expense
 
 app = FastAPI(title="Policy Auditor API", version="1.0.0")
 
@@ -15,28 +16,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-@app.get("/")
-async def root():
-    return {"message": "Policy Auditor API is running."}
-
 @app.post("/api/upload-receipt")
 async def upload_receipt(
     file: UploadFile = File(...), 
     justification: str = Form(...)
 ):
     try:
-        # 1. Pass the uploaded file to our AI engine
+        # Step 1: AI reads the receipt (The Eyes)
         extracted_data = await extract_receipt_data(file)
         
-        # 2. Return the AI's findings directly to the frontend
+        # Step 2: AI audits the data against the database (The Brain)
+        audit_result = audit_expense(extracted_data, justification)
+        
+        # Step 3: Return the complete package to the frontend
         return {
             "status": "success",
             "justification": justification,
-            "ai_extraction": extracted_data
+            "receipt_details": extracted_data,
+            "audit_verdict": audit_result
         }
         
     except Exception as e:
-        print(f"🔥 THE REAL ERROR IS: {repr(e)}")
+        print(f"🔥 THE REAL ERROR IS: {repr(e)}") 
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

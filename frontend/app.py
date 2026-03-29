@@ -1,43 +1,67 @@
 import streamlit as st
 import requests
+from PIL import Image
+import io
 
-# Backend URL
-API_URL = "http://localhost:8000"
+# Tell the frontend where the backend brain lives
+API_URL = "http://localhost:8000/api/upload-receipt"
 
-st.set_page_config(page_title="Expense Auditor", layout="wide")
+# 1. Page Configuration
+st.set_page_config(page_title="AI Expense Auditor", page_icon="🧾", layout="wide")
 
-st.sidebar.title("Navigation")
-view_mode = st.sidebar.radio("Select View", ["Employee Portal", "Finance Dashboard"])
+# 2. Main Header
+st.title("🧾 AI-Powered FinTech Auditor")
+st.markdown("Upload an expense receipt. The AI will extract the data, translate foreign languages, and instantly audit it against the corporate policy.")
 
-if view_mode == "Employee Portal":
-    st.title("💸 Submit an Expense")
-    st.markdown("Upload your receipt and provide a business justification.")
-    
-    with st.form("expense_form"):
-        receipt_file = st.file_uploader("Upload Receipt (Image or PDF)", type=["png", "jpg", "jpeg", "pdf"])
-        justification = st.text_area("Business Purpose", placeholder="e.g., Dinner with a prospective client.")
-        submitted = st.form_submit_button("Submit Claim")
-        
-        if submitted:
-            if receipt_file and justification:
-                with st.spinner("Uploading and analyzing..."):
-                    # Send data to FastAPI
-                    files = {"file": (receipt_file.name, receipt_file.getvalue(), receipt_file.type)}
+# 3. Layout: Two Columns
+col1, col2 = st.columns([1, 1.2])
+
+with col1:
+    st.subheader("1. Submit Expense Claim")
+    uploaded_file = st.file_uploader("Upload Receipt (JPG, PNG)", type=["jpg", "jpeg", "png"])
+    justification = st.text_input("Business Justification", placeholder="e.g., Client lunch with John Doe")
+    submit_button = st.button("Run AI Audit", type="primary", use_container_width=True)
+
+# 4. The Action Logic
+if submit_button:
+    if not uploaded_file or not justification:
+        st.warning("⚠️ Please upload a receipt and provide a justification.")
+    else:
+        with col2:
+            st.subheader("2. Audit Results")
+            
+            # Show the uploaded image
+            image = Image.open(uploaded_file)
+            st.image(image, caption="Uploaded Receipt", use_column_width=True)            
+            with st.spinner("🧠 AI is extracting data and querying the vector database..."):
+                try:
+                    uploaded_file.seek(0)
+                    files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
                     data = {"justification": justification}
                     
-                    try:
-                        response = requests.post(f"{API_URL}/api/upload-receipt", files=files, data=data)
-                        if response.status_code == 200:
-                            st.success("Receipt sent to backend successfully!")
-                            st.json(response.json())
+                    response = requests.post(API_URL, files=files, data=data)
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        audit = result["audit_verdict"]
+                        receipt_data = result["receipt_details"]
+                        
+                        status = audit.get("status", "UNKNOWN")
+                        if status == "APPROVED":
+                            st.success(f"✅ STATUS: {status}")
+                        elif status == "REJECTED":
+                            st.error(f"❌ STATUS: {status}")
                         else:
-                            st.error(f"Error communicating with backend: {response.status_code}")
-                    except requests.exceptions.ConnectionError:
-                        st.error("Backend is down! Please start the FastAPI server.")
-            else:
-                st.warning("Please upload a receipt and provide a justification.")
-
-elif view_mode == "Finance Dashboard":
-    st.title("📊 Finance Auditor Dashboard")
-    st.markdown("Review flagged claims and policy violations.")
-    st.info("The interactive data table and side-by-side view will be built here in Phase 2.")
+                            st.warning(f"⚠️ STATUS: {status}")
+                            
+                        st.markdown(f"**AI Reasoning:** {audit.get('reasoning')}")
+                        st.info(f"**Policy Rule Applied:** *\"{audit.get('policy_referenced')}\"*")
+                        
+                        with st.expander("View Raw Extracted Data (JSON)"):
+                            st.json(receipt_data)
+                            
+                    else:
+                        st.error(f"Backend Error: {response.status_code} - {response.text}")
+                        
+                except requests.exceptions.ConnectionError:
+                    st.error("🚨 CRITICAL: Could not connect to the backend. Is your FastAPI server running on port 8000?")
