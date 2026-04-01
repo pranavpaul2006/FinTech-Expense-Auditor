@@ -35,19 +35,19 @@ git clone https://github.com/pranavpaul/fintech-expense-auditor.git
 cd backend/app  
 pip install -r requirements.txt  
 
-Create a .env file inside the data folder and add your own Gemini API Key to run the OCR and Logic engine:
+Create a .env file inside the data folder and add your own Gemini API Key to run the OCR and Logic engine:  
 GEMINI_API_KEY=your_api_key_here
 
-python main.py
+python main.py  
 
 ### 2. Frontend setup
 
-cd frontend
-pip install -r requirements.txt
-streamlit run app.py
+cd frontend  
+pip install -r requirements.txt  
+streamlit run app.py  
 
 ### Testing Guide for Evaluators
-To fully evaluate the workflow and system architecture, please follow these steps:
+To fully evaluate the workflow and system architecture, please follow these steps:  
 
 ### Phase 1: The Employee Portal
 1. Open the Streamlit frontend in your browser.
