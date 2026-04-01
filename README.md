@@ -29,7 +29,8 @@ To run this application locally, you will need two terminal windows running simu
 
 ### 1. Clone the Repository
 
-git clone https://github.com/pranavpaul/fintech-expense-auditor.git
+git clone https://github.com/pranavpaul2006/FinTech-Expense-Auditor.git
+cd POLICY-AUDITOR
 
 ### 2.Backend Setup
 cd backend/app  

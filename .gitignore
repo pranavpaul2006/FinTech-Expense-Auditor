@@ -17,3 +17,8 @@ Thumbs.db
 
 .vscode/
 .idea/
+
+*.db
+*.sqlite
+*.sqlite3
+claims.db

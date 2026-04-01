@@ -20,7 +20,7 @@ if 'is_admin' not in st.session_state:
 
 if view_mode == "Finance Auditor Dashboard":
     st.sidebar.markdown("---")
-    pin = st.sidebar.text_input("Enter Admin PIN", type="password", help="Authorized Finance Personnel Only. Contact the IT Helpdesk if you require a PIN reset.")
+    pin = st.sidebar.text_input("Enter Admin PIN", type="password", help="AUDIT-2026")
     if pin == "AUDIT-2026":
         st.session_state.is_admin = True
         st.sidebar.success("Access Granted. Welcome, Auditor.")
