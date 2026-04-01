@@ -32,8 +32,8 @@ To run this application locally, you will need two terminal windows running simu
 git clone https://github.com/pranavpaul/fintech-expense-auditor.git
 
 ### 2.Backend Setup
-cd backend/app
-pip install -r requirements.txt
+cd backend/app  
+pip install -r requirements.txt  
 
 Create a .env file inside the data folder and add your own Gemini API Key to run the OCR and Logic engine:
 GEMINI_API_KEY=your_api_key_here
