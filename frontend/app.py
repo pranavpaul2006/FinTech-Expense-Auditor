@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 from PIL import Image
+import time
 import datetime 
 
 # Backend Endpoints
@@ -71,55 +72,65 @@ if view_mode == "Employee Portal" or not st.session_state.is_admin:
             col1, col2 = st.columns([1, 1.2])
 
             with col1:
-                st.subheader("Submit New Claim")
-                uploaded_file = st.file_uploader("Upload Receipt (JPG, PNG, PDF)", type=["jpg", "jpeg", "png", "pdf"])
+                st.subheader("Submit New Claim(s)")
+
+                uploaded_files = st.file_uploader("Upload Receipt(s) (JPG, PNG, PDF)", type=["jpg", "jpeg", "png", "pdf"], accept_multiple_files=True)
                 justification = st.text_input("Business Justification", placeholder="e.g., Client lunch")
                 claimed_date = st.date_input("Date of Expense", datetime.date.today())
-                submit_button = st.button("Run AI Audit", type="primary", use_container_width=True)
+                submit_button = st.button("Run AI Audit on Batch", type="primary", use_container_width=True)
 
             if submit_button:
-                if not uploaded_file or not justification:
-                    st.warning("⚠️ Please upload a receipt and provide a justification.")
+                if not uploaded_files or not justification:
+                    st.warning("⚠️ Please upload at least one receipt and provide a justification.")
                 else:
                     with col2:
-                        st.subheader("Audit Results")
-                        if uploaded_file.type == "application/pdf":
-                            st.info("📄 PDF Document Uploaded")
-                        else:
-                            image = Image.open(uploaded_file)
-                            st.image(image, caption="Uploaded Receipt", use_column_width=True)
+                        st.subheader("Batch Audit Results")
                         
-                        with st.spinner("🧠 AI is auditing your claim..."):
-                            try:
-                                uploaded_file.seek(0)
-                                files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-                                data = {
-                                    "justification": justification, 
-                                    "claimed_date": claimed_date.strftime("%Y-%m-%d"),
-                                    "employee_name": st.session_state.employee_name,
-                                    "employee_id": st.session_state.employee_id
-                                }
-                                
-                                response = requests.post(API_UPLOAD, files=files, data=data)
-                                
-                                if response.status_code == 200:
-                                    result = response.json()
-                                    audit = result["audit_verdict"]
+                        for uploaded_file in uploaded_files:
+                            st.markdown(f"#### Processing: {uploaded_file.name}")
+                            
+                            if uploaded_file.type == "application/pdf":
+                                st.info("📄 PDF Document Uploaded")
+                            else:
+                                image = Image.open(uploaded_file)
+
+                                st.image(image, caption=uploaded_file.name, width=250)
+                            
+                            with st.spinner(f"🧠 AI is auditing {uploaded_file.name}..."):
+                                try:
+                                    uploaded_file.seek(0)
+                                    files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+                                    data = {
+                                        "justification": justification, 
+                                        "claimed_date": claimed_date.strftime("%Y-%m-%d"),
+                                        "employee_name": st.session_state.employee_name,
+                                        "employee_id": st.session_state.employee_id
+                                    }
                                     
-                                    status = audit.get("status", "UNKNOWN")
-                                    if status == "APPROVED":
-                                        st.success(f"✅ AI DECISION: {status}")
-                                    elif status == "REJECTED":
-                                        st.error(f"❌ AI DECISION: {status}")
-                                    else:
-                                        st.warning(f"⚠️ AI DECISION: {status}")
+                                    response = requests.post(API_UPLOAD, files=files, data=data)
+                                    
+                                    if response.status_code == 200:
+                                        result = response.json()
+                                        audit = result["audit_verdict"]
                                         
-                                    st.info(f"**AI Reasoning:** {audit.get('reasoning')}")
-                                    st.caption(f"**Policy Referenced:** {audit.get('policy_referenced')}")
-                                else:
-                                    st.error(f"Backend Error: {response.text}")
-                            except Exception as e:
-                                st.error(f"Connection Error: {e}")
+                                        status = audit.get("status", "UNKNOWN")
+                                        if status == "APPROVED":
+                                            st.success(f"✅ AI DECISION: {status}")
+                                        elif status == "REJECTED":
+                                            st.error(f"❌ AI DECISION: {status}")
+                                        else:
+                                            st.warning(f"⚠️ AI DECISION: {status}")
+                                            
+                                        st.info(f"**AI Reasoning:** {audit.get('reasoning')}")
+                                        st.caption(f"**Policy Referenced:** {audit.get('policy_referenced')}")
+                                    else:
+                                        st.error(f"Backend Error: {response.text}")
+                                except Exception as e:
+                                    st.error(f"Connection Error: {e}")
+                            
+                            st.markdown("---") 
+
+                            time.sleep(4)
 
         # --- NEW: HISTORY TAB LOGIC ---
         with tab_history:
