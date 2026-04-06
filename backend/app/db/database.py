@@ -15,6 +15,7 @@ def init_db():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS claims (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_id TEXT,
             employee_name TEXT,
             merchant_name TEXT,
             total_amount REAL,
@@ -32,25 +33,26 @@ def init_db():
     conn.close()
     print("✅ SQLite Database initialized successfully!")
 
-def save_claim(receipt_data: dict, justification: str, audit_verdict: dict, employee_name: str = "Test Employee"):
+def save_claim(employee_id, employee_name, merchant_name, total_amount, currency, justification, ai_status, ai_reasoning, policy_referenced):
     """Saves a processed receipt into the database."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     cursor.execute('''
         INSERT INTO claims (
-            employee_name, merchant_name, total_amount, currency, justification, 
+            employee_id, employee_name, merchant_name, total_amount, currency, justification, 
             ai_status, ai_reasoning, policy_referenced, human_status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
+        employee_id,
         employee_name,
-        receipt_data.get('merchant_name', 'Unknown'),
-        receipt_data.get('total_amount', 0.0),
-        receipt_data.get('currency', 'USD'),
+        merchant_name,
+        total_amount,
+        currency,
         justification,
-        audit_verdict.get('status', 'UNKNOWN'),
-        audit_verdict.get('reasoning', ''),
-        audit_verdict.get('policy_referenced', ''),
+        ai_status,
+        ai_reasoning,
+        policy_referenced,
         'PENDING' # The human hasn't reviewed it yet!
     ))
     
@@ -84,7 +86,6 @@ def update_claim_status(claim_id: int, new_status: str, comment: str):
     conn.commit()
     conn.close()
     return True
-
 
 if __name__ == "__main__":
     init_db()

@@ -2,14 +2,12 @@ from db.database import init_db, save_claim, get_all_claims, update_claim_status
 from pydantic import BaseModel
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+import time
 import uvicorn
 
-# Import our services
 from services.ocr_service import extract_receipt_data
 from services.audit_service import audit_expense
 
-# NEW: Import our database functions
-from db.database import init_db, save_claim, get_all_claims
 class ClaimUpdate(BaseModel):
     claim_id: int
     new_status: str
@@ -25,29 +23,71 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# NEW: Initialize the database the second the server boots up
 init_db()
 
 @app.post("/api/upload-receipt")
 async def upload_receipt(
     file: UploadFile = File(...), 
     justification: str = Form(...),
-    employee_name: str = Form("John Doe") # Default dummy employee
+    claimed_date: str = Form(...),
+    employee_name: str = Form(...),
+    employee_id: str = Form(...)
 ):
     try:
-        # Step 1: AI reads the receipt
+        # Step 1: Read the image
         extracted_data = await extract_receipt_data(file)
         
-        # Step 2: AI audits the data
-        audit_result = audit_expense(extracted_data, justification)
+        time.sleep(2)
+
+        merchant = extracted_data.get("merchant_name", "Unknown Merchant")
+        total = extracted_data.get("total_amount", 0.0)
+        currency = extracted_data.get("currency", "USD")
+
+        # --- NEW: FRAUD RING DETECTOR (Duplicate Check) ---
         
-        # NEW: Step 3: Save the claim permanently to the SQLite database
-        claim_id = save_claim(extracted_data, justification, audit_result, employee_name)
+        is_duplicate = False
+        original_submitter = ""
         
-        # Step 4: Return the package to the frontend
+        all_claims = get_all_claims()
+        for claim in all_claims:
+            # If the exact same merchant and amount exist in the DB...
+            if claim['merchant_name'] == merchant and str(claim['total_amount']) == str(total):
+                is_duplicate = True
+                original_submitter = claim['employee_name']
+                break
+        
+        if is_duplicate:
+            # Instantly reject it without even doing a full policy audit
+            audit_result = {
+                "status": "REJECTED",
+                "reasoning": f"FRAUD ALERT: A receipt for {merchant} totaling {total} was already submitted by {original_submitter}.",
+                "policy_referenced": "Zero Tolerance Policy: Duplicate submissions are strictly prohibited."
+            }
+        else:
+            # Step 2: If it's not a duplicate, run the normal AI Policy Audit
+            audit_result = audit_expense(extracted_data, justification, claimed_date)
+        
+        # Unpack the Audit data
+        status = audit_result.get("status", "UNKNOWN")
+        reasoning = audit_result.get("reasoning", "No reasoning provided.")
+        policy = audit_result.get("policy_referenced", "None")
+        
+        # Save to database
+        claim_id = save_claim(
+            employee_id, 
+            employee_name, 
+            merchant, 
+            total, 
+            currency, 
+            justification, 
+            status, 
+            reasoning, 
+            policy
+        )
+        
         return {
             "status": "success",
-            "claim_id": claim_id, # We now return the Database ID!
+            "claim_id": claim_id, 
             "justification": justification,
             "receipt_details": extracted_data,
             "audit_verdict": audit_result
@@ -57,7 +97,17 @@ async def upload_receipt(
         print(f"🔥 THE REAL ERROR IS: {repr(e)}") 
         raise HTTPException(status_code=500, detail=str(e))
 
-# NEW: Step 5: The endpoint for the Auditor Dashboard
+# --- NEW: ENDPOINT FOR EMPLOYEE HISTORY ---
+@app.get("/api/my-claims/{emp_id}")
+async def fetch_my_claims(emp_id: str):
+    try:
+        all_claims = get_all_claims()
+        # Filter the database to only show claims matching the employee's ID
+        my_claims = [claim for claim in all_claims if claim['employee_id'] == emp_id]
+        return {"status": "success", "claims": my_claims}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/claims")
 async def fetch_claims():
     try:
@@ -66,7 +116,6 @@ async def fetch_claims():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# NEW: Step 6: The Human Override Endpoint
 @app.post("/api/update-claim")
 async def update_claim(payload: ClaimUpdate):
     try:
