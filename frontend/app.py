@@ -3,25 +3,32 @@ import requests
 import pandas as pd
 from PIL import Image
 import time
-import datetime 
+import datetime
+import altair as alt
 
-# Backend Endpoints
 API_UPLOAD = "http://localhost:8000/api/upload-receipt"
 API_CLAIMS = "http://localhost:8000/api/claims"
 API_UPDATE = "http://localhost:8000/api/update-claim"
 
 st.set_page_config(page_title="AI Expense Auditor", page_icon="🧾", layout="wide")
 
-# --- SECURITY GATE (RBAC) ---
+def get_traffic_light_color(val):
+    if val == 'APPROVED':
+        return 'background-color: #198754; color: white; font-weight: bold;' 
+    elif val == 'REJECTED':
+        return 'background-color: #dc3545; color: white; font-weight: bold;' 
+    elif val in ['FLAGGED_FOR_REVIEW', 'NEEDS_MORE_INFO', 'PENDING']:
+        return 'background-color: #ffc107; color: black; font-weight: bold;' 
+    return ''
+
 st.sidebar.title("🔐 Access Control")
-# NEW: Added C-Suite Analytics to the radio menu
 view_mode = st.sidebar.radio("Select Interface:", ["Employee Portal", "Finance Auditor Dashboard", "C-Suite Analytics"])
 
 if 'is_admin' not in st.session_state:
     st.session_state.is_admin = False
 
 if view_mode in ["Finance Auditor Dashboard", "C-Suite Analytics"]:
-    st.sidebar.markdown("---")
+    st.sidebar.divider()
     pin = st.sidebar.text_input("Enter Admin PIN", type="password", help="AUDIT-2026")
     if pin == "AUDIT-2026":
         st.session_state.is_admin = True
@@ -32,9 +39,6 @@ if view_mode in ["Finance Auditor Dashboard", "C-Suite Analytics"]:
 else:
     st.session_state.is_admin = False
 
-# ==========================================
-# VIEW 1: THE EMPLOYEE PORTAL
-# ==========================================
 if view_mode == "Employee Portal" or not st.session_state.is_admin:
     st.title("🧾 Employee Expense Portal")
     
@@ -43,18 +47,19 @@ if view_mode == "Employee Portal" or not st.session_state.is_admin:
         st.session_state.employee_id = None
 
     if st.session_state.employee_name is None:
-        st.markdown("### 🔒 Employee Sign-In")
-        col_login, _ = st.columns([1, 2])
-        with col_login:
-            emp_name_input = st.text_input("Full Name", placeholder="e.g., Pranav Paul")
-            emp_id_input = st.text_input("Employee ID", placeholder="e.g., EMP-1042")
-            if st.button("Access Portal", type="primary"):
-                if emp_name_input.strip() == "" or emp_id_input.strip() == "":
-                    st.error("Please enter both your Name and Employee ID.")
-                else:
-                    st.session_state.employee_name = emp_name_input.strip()
-                    st.session_state.employee_id = emp_id_input.strip()
-                    st.rerun() 
+        with st.container(border=True):
+            st.markdown("### 🔒 Employee Sign-In")
+            col_login, _ = st.columns([1, 2])
+            with col_login:
+                emp_name_input = st.text_input("Full Name", placeholder="e.g., Pranav Paul")
+                emp_id_input = st.text_input("Employee ID", placeholder="e.g., EMP-1042")
+                if st.button("Access Portal", type="primary", use_container_width=True):
+                    if emp_name_input.strip() == "" or emp_id_input.strip() == "":
+                        st.error("Please enter both your Name and Employee ID.")
+                    else:
+                        st.session_state.employee_name = emp_name_input.strip()
+                        st.session_state.employee_id = emp_id_input.strip()
+                        st.rerun() 
     else:
         st.success(f"👋 Welcome back, **{st.session_state.employee_name}**!")
         if st.button("Sign Out"):
@@ -62,9 +67,8 @@ if view_mode == "Employee Portal" or not st.session_state.is_admin:
             st.session_state.employee_id = None
             st.rerun()
             
-        st.markdown("---")
+        st.divider()
         
-        # --- NEW: TABBED VIEW FOR UPLOADS AND HISTORY ---
         tab_upload, tab_history = st.tabs(["📤 Submit New Claim", "🔔 My Claim Alerts"])
 
         with tab_upload:
@@ -72,12 +76,12 @@ if view_mode == "Employee Portal" or not st.session_state.is_admin:
             col1, col2 = st.columns([1, 1.2])
 
             with col1:
-                st.subheader("Submit New Claim(s)")
-
-                uploaded_files = st.file_uploader("Upload Receipt(s) (JPG, PNG, PDF)", type=["jpg", "jpeg", "png", "pdf"], accept_multiple_files=True)
-                justification = st.text_input("Business Justification", placeholder="e.g., Client lunch")
-                claimed_date = st.date_input("Date of Expense", datetime.date.today())
-                submit_button = st.button("Run AI Audit on Batch", type="primary", use_container_width=True)
+                with st.container(border=True):
+                    st.subheader("Submit New Claim(s)")
+                    uploaded_files = st.file_uploader("Upload Receipt(s) (JPG, PNG, PDF)", type=["jpg", "jpeg", "png", "pdf"], accept_multiple_files=True)
+                    justification = st.text_input("Business Justification", placeholder="e.g., Client lunch")
+                    claimed_date = st.date_input("Date of Expense", datetime.date.today())
+                    submit_button = st.button("Run AI Audit on Batch", type="primary", use_container_width=True)
 
             if submit_button:
                 if not uploaded_files or not justification:
@@ -87,52 +91,49 @@ if view_mode == "Employee Portal" or not st.session_state.is_admin:
                         st.subheader("Batch Audit Results")
                         
                         for uploaded_file in uploaded_files:
-                            st.markdown(f"#### Processing: {uploaded_file.name}")
-                            
-                            if uploaded_file.type == "application/pdf":
-                                st.info("📄 PDF Document Uploaded")
-                            else:
-                                image = Image.open(uploaded_file)
-
-                                st.image(image, caption=uploaded_file.name, width=250)
-                            
-                            with st.spinner(f"🧠 AI is auditing {uploaded_file.name}..."):
-                                try:
-                                    uploaded_file.seek(0)
-                                    files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-                                    data = {
-                                        "justification": justification, 
-                                        "claimed_date": claimed_date.strftime("%Y-%m-%d"),
-                                        "employee_name": st.session_state.employee_name,
-                                        "employee_id": st.session_state.employee_id
-                                    }
-                                    
-                                    response = requests.post(API_UPLOAD, files=files, data=data)
-                                    
-                                    if response.status_code == 200:
-                                        result = response.json()
-                                        audit = result["audit_verdict"]
+                            with st.container(border=True):
+                                st.markdown(f"#### Processing: {uploaded_file.name}")
+                                
+                                if uploaded_file.type == "application/pdf":
+                                    st.info("📄 PDF Document Uploaded")
+                                else:
+                                    image = Image.open(uploaded_file)
+                                    st.image(image, caption=uploaded_file.name, use_container_width=True)
+                                
+                                with st.spinner(f"🧠 AI is auditing {uploaded_file.name}..."):
+                                    try:
+                                        uploaded_file.seek(0)
+                                        files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+                                        data = {
+                                            "justification": justification, 
+                                            "claimed_date": claimed_date.strftime("%Y-%m-%d"),
+                                            "employee_name": st.session_state.employee_name,
+                                            "employee_id": st.session_state.employee_id
+                                        }
                                         
-                                        status = audit.get("status", "UNKNOWN")
-                                        if status == "APPROVED":
-                                            st.success(f"✅ AI DECISION: {status}")
-                                        elif status == "REJECTED":
-                                            st.error(f"❌ AI DECISION: {status}")
-                                        else:
-                                            st.warning(f"⚠️ AI DECISION: {status}")
+                                        response = requests.post(API_UPLOAD, files=files, data=data)
+                                        
+                                        if response.status_code == 200:
+                                            result = response.json()
+                                            audit = result["audit_verdict"]
                                             
-                                        st.info(f"**AI Reasoning:** {audit.get('reasoning')}")
-                                        st.caption(f"**Policy Referenced:** {audit.get('policy_referenced')}")
-                                    else:
-                                        st.error(f"Backend Error: {response.text}")
-                                except Exception as e:
-                                    st.error(f"Connection Error: {e}")
-                            
-                            st.markdown("---") 
+                                            status = audit.get("status", "UNKNOWN")
+                                            if status == "APPROVED":
+                                                st.success(f"✅ AI DECISION: {status}")
+                                            elif status == "REJECTED":
+                                                st.error(f"❌ AI DECISION: {status}")
+                                            else:
+                                                st.warning(f"⚠️ AI DECISION: {status}")
+                                                
+                                            st.info(f"**AI Reasoning:** {audit.get('reasoning')}")
+                                            st.caption(f"**Policy Referenced:** {audit.get('policy_referenced')}")
+                                        else:
+                                            st.error(f"Backend Error: {response.text}")
+                                    except Exception as e:
+                                        st.error(f"Connection Error: {e}")
+                                
+                                time.sleep(4)
 
-                            time.sleep(4)
-
-        # --- NEW: HISTORY TAB LOGIC ---
         with tab_history:
             st.subheader("Your Submission History")
             try:
@@ -143,20 +144,18 @@ if view_mode == "Employee Portal" or not st.session_state.is_admin:
                         st.info("You have no past claims.")
                     else:
                         for claim in user_claims:
-                            final_status = claim['human_status'] if claim['human_status'] != 'PENDING' else claim['ai_status']
-                            
-                            if final_status == "APPROVED":
-                                st.success(f"✅ **APPROVED:** {claim['merchant_name']} - ${claim['total_amount']}")
-                            elif final_status == "REJECTED":
-                                st.error(f"❌ **REJECTED:** {claim['merchant_name']} - ${claim['total_amount']} \n\n*Reason: {claim['ai_reasoning']}*")
-                            else:
-                                st.warning(f"⏳ **PENDING REVIEW:** {claim['merchant_name']} - ${claim['total_amount']}")
+                            with st.container(border=True):
+                                final_status = claim['human_status'] if claim['human_status'] != 'PENDING' else claim['ai_status']
+                                
+                                if final_status == "APPROVED":
+                                    st.success(f"✅ **APPROVED:** {claim['merchant_name']} - ${claim['total_amount']}")
+                                elif final_status == "REJECTED":
+                                    st.error(f"❌ **REJECTED:** {claim['merchant_name']} - ${claim['total_amount']} \n\n*Reason: {claim['ai_reasoning']}*")
+                                else:
+                                    st.warning(f"⏳ **PENDING REVIEW:** {claim['merchant_name']} - ${claim['total_amount']}")
             except Exception as e:
                 st.error("Could not load notifications.")
 
-# ==========================================
-# VIEW 2: THE SECURE AUDITOR DASHBOARD
-# ==========================================
 elif view_mode == "Finance Auditor Dashboard" and st.session_state.is_admin:
     st.title("🛡️ Finance Auditor Queue")
     st.markdown("Review AI-flagged claims and provide final human authorization.")
@@ -169,59 +168,60 @@ elif view_mode == "Finance Auditor Dashboard" and st.session_state.is_admin:
                 st.info("🎉 No pending claims in the queue! Go grab a coffee.")
             else:
                 df = pd.DataFrame(claims_data)
+                
+                priority_map = {'FLAGGED_FOR_REVIEW': 1, 'NEEDS_MORE_INFO': 1, 'PENDING': 1, 'REJECTED': 2, 'APPROVED': 3}
+                df['sort_priority'] = df['ai_status'].map(priority_map).fillna(4)
+                df = df.sort_values('sort_priority').drop(columns=['sort_priority'])
+                
                 display_df = df[['id', 'employee_name', 'merchant_name', 'total_amount', 'ai_status', 'human_status', 'auditor_comment', 'created_at']]
+                display_df.columns = ['Claim ID', 'Employee', 'Merchant', 'Total ($)', 'AI Status', 'Human Status', 'Auditor Comment', 'Date Submitted']
                 
                 st.dataframe(
-                    display_df.style.map(
-                        lambda x: 'background-color: #ffcccc' if x == 'FLAGGED_FOR_REVIEW' else ('background-color: #ccffcc' if x == 'APPROVED' else ''),
-                        subset=['ai_status']
-                    ),
+                    display_df.style.map(get_traffic_light_color, subset=['AI Status', 'Human Status']),
                     use_container_width=True,
                     hide_index=True
                 )
                 
-                st.markdown("---")
-                st.subheader("✍️ Human Override Panel")
+                st.divider()
                 
-                colA, colB, colC = st.columns(3)
-                with colA:
-                    available_ids = display_df['id'].tolist()
-                    selected_id = st.selectbox("Select Claim ID to Review", available_ids)
-                
-                if selected_id:
-                    selected_claim = df[df['id'] == selected_id].iloc[0]
-                    with st.expander(f"📄 View Full AI Audit File for Claim #{selected_id}", expanded=True):
-                        st.markdown(f"**Employee Justification:** {selected_claim['justification']}")
-                        st.markdown(f"**AI Reasoning:** {selected_claim['ai_reasoning']}")
-                        st.info(f"**Corporate Policy Applied:** *\"{selected_claim['policy_referenced']}\"*")
+                with st.container(border=True):
+                    st.subheader("✍️ Human Override Panel")
+                    
+                    colA, colB, colC = st.columns(3)
+                    with colA:
+                        available_ids = display_df['Claim ID'].tolist()
+                        selected_id = st.selectbox("Select Claim ID to Review", available_ids)
+                    
+                    if selected_id:
+                        selected_claim = df[df['id'] == selected_id].iloc[0]
+                        with st.expander(f"📄 View Full AI Audit File for Claim #{selected_id}", expanded=True):
+                            st.markdown(f"**Employee Justification:** {selected_claim['justification']}")
+                            st.markdown(f"**AI Reasoning:** {selected_claim['ai_reasoning']}")
+                            st.info(f"**Corporate Policy Applied:** *\"{selected_claim['policy_referenced']}\"*")
 
-                with colB:
-                    new_status = st.selectbox("Final Human Verdict", ["APPROVED", "REJECTED", "NEEDS_MORE_INFO"])
-                
-                with colC:
-                    auditor_comment = st.text_input("Auditor Comment", placeholder="e.g., Verified exchange rate.")
-                
-                if st.button("Submit Final Verdict", type="primary"):
-                    if not auditor_comment:
-                        st.warning("⚠️ A justification comment is required to override the AI.")
-                    else:
-                        update_payload = {"claim_id": selected_id, "new_status": new_status, "comment": auditor_comment}
-                        update_res = requests.post(API_UPDATE, json=update_payload)
-                        if update_res.status_code == 200:
-                            st.success(f"✅ Claim #{selected_id} successfully updated!")
-                            st.rerun() 
+                    with colB:
+                        new_status = st.selectbox("Final Human Verdict", ["APPROVED", "REJECTED", "NEEDS_MORE_INFO"])
+                    
+                    with colC:
+                        auditor_comment = st.text_input("Auditor Comment", placeholder="e.g., Verified exchange rate.")
+                    
+                    if st.button("Submit Final Verdict", type="primary"):
+                        if not auditor_comment:
+                            st.warning("⚠️ A justification comment is required to override the AI.")
+                        else:
+                            update_payload = {"claim_id": selected_id, "new_status": new_status, "comment": auditor_comment}
+                            update_res = requests.post(API_UPDATE, json=update_payload)
+                            if update_res.status_code == 200:
+                                st.success(f"✅ Claim #{selected_id} successfully updated!")
+                                st.rerun() 
         else:
             st.error("Failed to load database.")
     except Exception as e:
         st.error(f"Could not connect to database endpoint: {e}")
 
-# ==========================================
-# VIEW 3: C-SUITE ANALYTICS
-# ==========================================
 elif view_mode == "C-Suite Analytics" and st.session_state.is_admin:
     st.title("📊 C-Suite Analytics Dashboard")
     st.markdown("High-level overview of corporate spending and AI auditing efficiency.")
-    
     
     try:
         response = requests.get(API_CLAIMS)
@@ -231,33 +231,55 @@ elif view_mode == "C-Suite Analytics" and st.session_state.is_admin:
                 st.info("No data available yet. Have employees submit claims to populate charts.")
             else:
                 df = pd.DataFrame(claims_data)
-                
-                # Convert total_amount to numeric just in case
                 df['total_amount'] = pd.to_numeric(df['total_amount'], errors='coerce').fillna(0)
                 
-                # Top Metrics
-                col1, col2, col3 = st.columns(3)
-                total_spend = df[df['ai_status'] == 'APPROVED']['total_amount'].sum()
-                fraud_prevented = df[df['ai_status'] == 'REJECTED']['total_amount'].sum()
-                total_claims = len(df)
+                with st.container(border=True):
+                    col1, col2, col3 = st.columns(3)
+                    total_spend = df[df['ai_status'] == 'APPROVED']['total_amount'].sum()
+                    fraud_prevented = df[df['ai_status'] == 'REJECTED']['total_amount'].sum()
+                    total_claims = len(df)
+                    
+                    col1.metric("Total Approved Spend", f"${total_spend:,.2f}")
+                    col2.metric("Fraud / Violations Blocked", f"${fraud_prevented:,.2f}")
+                    col3.metric("Total Claims Processed", total_claims)
                 
-                col1.metric("Total Approved Spend", f"${total_spend:,.2f}")
-                col2.metric("Fraud / Violations Blocked", f"${fraud_prevented:,.2f}")
-                col3.metric("Total Claims Processed", total_claims)
-                
-                st.markdown("---")
+                st.divider()
                 
                 col_chart1, col_chart2 = st.columns(2)
                 
                 with col_chart1:
-                    st.subheader("Spend by Merchant")
-                    merchant_spend = df.groupby('merchant_name')['total_amount'].sum().sort_values(ascending=False).head(5)
-                    st.bar_chart(merchant_spend)
+                    with st.container(border=True):
+                        st.subheader("Spend by Merchant")
+                        merchant_df = df.groupby('merchant_name')['total_amount'].sum().sort_values(ascending=False).head(5).reset_index()
+                        merchant_df.columns = ['Merchant', 'Total Spend']
+                        
+                        chart1 = alt.Chart(merchant_df).mark_bar(color='#4c78a8').encode(
+                            x=alt.X('Merchant', sort='-y', axis=alt.Axis(labelAngle=-45)),
+                            y='Total Spend',
+                            tooltip=['Merchant', 'Total Spend']
+                        ).properties(height=300)
+                        
+                        st.altair_chart(chart1, use_container_width=True)
                     
                 with col_chart2:
-                    st.subheader("AI Decision Breakdown")
-                    status_counts = df['ai_status'].value_counts()
-                    st.bar_chart(status_counts)
+                    with st.container(border=True):
+                        st.subheader("AI Decision Breakdown")
+                        status_df = df['ai_status'].value_counts().reset_index()
+                        status_df.columns = ['Status', 'Count']
+                        
+                        color_scale = alt.Scale(
+                            domain=['APPROVED', 'REJECTED', 'FLAGGED_FOR_REVIEW', 'NEEDS_MORE_INFO', 'PENDING'],
+                            range=['#198754', '#dc3545', '#ffc107', '#ffc107', '#ffc107']
+                        )
+                        
+                        chart2 = alt.Chart(status_df).mark_bar().encode(
+                            x=alt.X('Status', axis=alt.Axis(labelAngle=-45)),
+                            y='Count',
+                            color=alt.Color('Status', scale=color_scale, legend=None),
+                            tooltip=['Status', 'Count']
+                        ).properties(height=300)
+                        
+                        st.altair_chart(chart2, use_container_width=True)
                     
     except Exception as e:
         st.error(f"Could not load analytics: {e}")
