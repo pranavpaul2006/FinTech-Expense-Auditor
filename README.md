@@ -1,76 +1,84 @@
-# 🧾 AI-Powered FinTech Expense Auditor
+# FinTech Ai Expense Auditor
 
-An autonomous, full-stack enterprise application that utilizes Multimodal Vision LLMs and Retrieval-Augmented Generation (RAG) to process corporate expense receipts, extract structured data, and automatically audit claims against strict corporate policies. 
+## 🚩 The Problem
+Corporate expense policies are often dense, multi-page documents that are difficult for employees to navigate, leading to frequent non-compliance and rejected claims. Manual auditing of these receipts against complex rules is a high-latency process for finance departments, often resulting in human error and reimbursement delays.
 
-The system includes a stateful SQLite database and a Role-Based Access Control (RBAC) frontend, ensuring AI decisions are transparent and subject to a Human-in-the-Loop (HITL) review process by authorized Finance Auditors.
+## 💡 The Solution
+This project is an **AI-powered Expense Auditing System** that automates the verification of financial claims using **Retrieval-Augmented Generation (RAG)**. 
 
-
-
-## 🚀 Key Features
-
-* **Multimodal Data Extraction:** Upload raw receipt images. The AI automatically translates foreign languages, performs currency conversions, and extracts highly structured JSON data (Merchant, Date, Total, Taxes).
-* **RAG-Powered Policy Auditing:** Queries a local ChromaDB vector database containing corporate policy documents to mathematically cross-reference extracted receipt data against specific company rules (e.g., Tier 1 City meal limits).
-* **State Management:** Fully stateful application using a lightweight SQLite database to maintain an immutable audit trail of all processed claims.
-* **Role-Based Access Control (RBAC):** UI segregation between the standard Employee Submission Portal and the secure Finance Auditor queue.
-* **Human-in-the-Loop (HITL) Architecture:** An interactive dashboard that allows HR Admins to review AI-flagged claims, view the explicit AI reasoning and policy snippets, and issue final overrides with permanent database comments.
+## ✨ Core Features
+* **Intelligent OCR:** High-accuracy extraction of Date, Amount, Category, and Merchant from blurry or complex receipts.
+* **RAG-Powered Policy Engine:** Uses **ChromaDB** to index 40+ pages of policy and retrieve only relevant rules for each claim.
+* **Multi-Currency Support:** AI automatically detects and converts foreign currency based on policy guidelines.
+* **Immutable Audit Trail:** Every decision (AI or Human) is logged in a persistent SQLite database for tax and compliance filing.
+* **Real-time Logic:** Fast asynchronous communication between Streamlit and FastAPI using Docker networking.
+* **Automated Budget Forecasting:** 30-day spending projections based on historical claim data.
 
 ## 🛠️ Tech Stack
+* **Programming Language:** Python 3.10
+* **Backend Framework:** FastAPI (Asynchronous ASGI)
+* **Frontend Interface:** Streamlit
+* **AI/LLM:** Google Gemini API (Generative AI)
+* **Orchestration:** LangChain (RAG Framework)
+* **Vector Database:** ChromaDB
+* **DevOps:** Docker & Docker Compose (Containerization), Render (Cloud Hosting)
 
-* **Frontend:** Streamlit, Pandas (Data processing)
-* **Backend:** FastAPI, Python
-* **AI & Machine Learning:** Google Gemini Flash (High-Speed Multimodal OCR & Logic), ChromaDB (Vector Search), SentenceTransformers (Embeddings)
-* **Database:** SQLite (Relational State Management)
+## 🚀 Setup Instructions
 
----
+### 1. Prerequisites
+* Ensure **Docker** and **Docker Compose** are installed on your machine.
+* Obtain a **Google Gemini API Key** from the Google AI Studio.
 
-## 💻 Local Setup & Installation
+### 2. Local Development (Docker)
+1.  **Clone the Repository:**
+    ```bash
+    git clone https://github.com/pranavpaul2006/FinTech-Expense-Auditor.git  
+    cd POLICY-AUDITOR  
+    ```
 
-To run this application locally, you will need two terminal windows running simultaneously (one for the backend API, one for the frontend UI).
+2.  **Configure Environment Variables:**
+    Create a `.env` file in the root directory and add your API key:
+    ```env
+    GOOGLE_API_KEY=your_gemini_api_key_here
+    ```
 
-### 1. Clone the Repository
+3.  **Launch the Application:**
+    ```bash
+    docker-compose up --build
+    ```
+    * **Frontend UI:** `http://localhost:8501`
+    * **Backend API:** `http://localhost:8000`
 
-git clone https://github.com/pranavpaul2006/FinTech-Expense-Auditor.git
-cd POLICY-AUDITOR
+4. **Testing Guide for Evaluators:**
 
-### 2.Backend Setup
-cd backend/app  
-pip install -r requirements.txt  
+    ### 🏢 Phase 1: The Employee Portal (Submission)
+    1. **Upload:** Employees upload a sample receipt (Image or PDF) via the Streamlit interface.
+    2. **Justification:** Users provide a business reason for the expense.
+    3. **AI Audit:** The system triggers Gemini 1.5 Flash to extract data and apply corporate policy rules.
+    4. **Instant Status:** The claim is instantly categorized as **APPROVED**, **REJECTED**, or **FLAGGED_FOR_REVIEW**.
 
-Create a .env file inside the data folder and add your own Gemini API Key to run the OCR and Logic engine:  
-GEMINI_API_KEY=your_api_key_here
+    ### 🛡️ Phase 2: Human-in-the-Loop Override (Audit)
+    1. **Secure Access:** Auditors switch to the Dashboard using the Admin PIN: `AUDIT-2026`.
+    2. **Detail View:** Auditors can see the AI's exact reasoning and the specific policy snippet used for the decision.
+    3. **Manual Override:** Change statuses (e.g., PENDING to APPROVED) with a justification comment to maintain an immutable audit trail in the SQLite database.
 
-python main.py  
+    ### 📈 Phase 3: Executive Analytics (C-Suite)
+    1. **Compliance Heatmap:** Aggregated data showing spending trends across departments.
+    2. **Budget Leakage:** Real-time tracking of the total value of policy violations prevented.
+    3. **AI Efficiency:** KPI dashboard showing the ratio of AI-processed vs. human-processed claims.
 
-### 2. Frontend setup
+### 3. Cloud Deployment (Render)
+To deploy this monorepo on Render, use the following configurations:
 
-cd frontend  
-pip install -r requirements.txt  
-streamlit run app.py  
+**Backend Service:**
+* **Root Directory:** `backend`
+* **Runtime:** `Docker`
+* **Dockerfile Path:** `Dockerfile`
+* **Environment Variables:** * `GOOGLE_API_KEY`: [Your Key]
+    * `PYTHONPATH`: `/app/app` (Required for internal module resolution)
 
-### Testing Guide for Evaluators
-To fully evaluate the workflow and system architecture, please follow these steps:  
+**Frontend Service:**
+* **Root Directory:** `frontend`
+* **Runtime:** `Docker`
+* **Note:** Update the `API_URL` in `app.py` to point to your live Render backend URL before deploying.
 
-### Phase 1: The Employee Portal
-1. Open the Streamlit frontend in your browser.
-
-2. Ensure you are in the Employee Portal (default view).
-
-3. Upload a sample receipt (e.g., a complex receipt with foreign currency or missing information).
-
-4. Provide a business justification and click Run AI Audit.
-
-5. Observe the AI extracting the data, applying corporate policy rules, and generating an initial status (APPROVED, REJECTED, or FLAGGED_FOR_REVIEW).
-
-### Phase 2: The Human-in-the-Loop Override
-1. In the left sidebar, switch the view to the Finance Auditor Dashboard.
-
-2. When prompted for the Admin PIN, enter the demo credentials:
-AUDIT-2026
-
-3. Review the color-coded queue of pending claims pulled directly from the SQLite database.
-
-4. Select a specific Claim ID from the dropdown menu to trigger the Audit Detail View. This pop-up will reveal the AI's exact reasoning and the corporate policy snippet used to make the decision.
-
-5. Use the control panel to override the AI's decision (e.g., change from PENDING to APPROVED), leave a justification comment, and click Submit Final Verdict.
-
-6. Observe the database table instantly update to reflect your immutable audit trail.
