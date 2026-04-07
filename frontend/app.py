@@ -98,7 +98,7 @@ if view_mode == "Employee Portal" or not st.session_state.is_admin:
                                     st.info("📄 PDF Document Uploaded")
                                 else:
                                     image = Image.open(uploaded_file)
-                                    st.image(image, caption=uploaded_file.name, use_container_width=True)
+                                    st.image(image, caption=uploaded_file.name, width="stretch")
                                 
                                 with st.spinner(f"🧠 AI is auditing {uploaded_file.name}..."):
                                     try:

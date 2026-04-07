@@ -1,2 +1,5 @@
-streamlit==1.32.2
+streamlit-1.56.0
 requests==2.31.0
+pandas
+altair
+pillow

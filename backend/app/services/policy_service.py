@@ -1,61 +1,60 @@
 import os
 import chromadb
 from pypdf import PdfReader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
-# 1. Define where the database and the PDF live
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 DB_PATH = os.path.join(BASE_DIR, "data", "chroma_db")
-POLICY_PATH = os.path.join(BASE_DIR, "data", "policy", "corporate_policy.pdf")
+POLICY_PATH = os.path.join(BASE_DIR, "data", "policy", "company_policy.pdf")
 
-# 2. Initialize ChromaDB
 chroma_client = chromadb.PersistentClient(path=DB_PATH)
-
-# Get or create a "collection" (like a table in a normal database)
-collection = chroma_client.get_or_create_collection(name="corporate_policy")
+collection = chroma_client.get_or_create_collection(name="company_policy")
 
 def build_vector_db():
-    """Reads the PDF, chunks the text, and stores it in the vector database."""
     print("Checking database status...")
     
-    # If we already have data, we don't need to rebuild it
     if collection.count() > 0:
         print(f"Database already populated with {collection.count()} policy chunks.")
         return
 
-    print("Reading corporate policy PDF...")
+    print(f"Reading corporate policy PDF from {POLICY_PATH}...")
     try:
         reader = PdfReader(POLICY_PATH)
         raw_text = ""
         for page in reader.pages:
             raw_text += page.extract_text() + "\n"
     except Exception as e:
-        print(f"Error reading PDF. Make sure it is saved at {POLICY_PATH}")
-        print(f"Exact error: {e}")
+        print(f"❌ Error reading PDF: {e}")
         return
 
-    # 3. Chunking: Split the text by double newlines to separate paragraphs
-    chunks = [chunk.strip() for chunk in raw_text.split('\n\n') if len(chunk.strip()) > 10]
+    # --- THE UPGRADE: Advanced Chunking ---
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=100,
+        separators=["\n\n", "\n", " ", ""]
+    )
     
-    print(f"Split policy into {len(chunks)} chunks. Generating embeddings...")
+    # We use split_text because raw_text is a giant string
+    chunks = text_splitter.split_text(raw_text)
+    
+    print(f"✅ Split 40-page policy into {len(chunks)} optimized chunks.")
 
     # 4. Load into ChromaDB
+    # Note: Chroma handles the embeddings automatically using its default model
     for i, chunk in enumerate(chunks):
         collection.add(
             documents=[chunk],
             ids=[f"policy_chunk_{i}"]
         )
     
-    print("✅ Vector Database successfully built!")
+    print("🚀 Vector Database successfully built with 40-page context!")
 
-def search_policy(query: str, n_results: int = 2) -> list:
-    """Searches the database for the most relevant policy rules based on the user's query."""
+def search_policy(query: str, n_results: int = 5) -> list:
     results = collection.query(
         query_texts=[query],
         n_results=n_results
     )
-    # Return the actual text of the matching paragraphs
     return results['documents'][0]
 
-# If we run this file directly, build the database!
 if __name__ == "__main__":
     build_vector_db()
