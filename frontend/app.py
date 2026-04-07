@@ -6,9 +6,9 @@ import time
 import datetime
 import altair as alt
 
-API_UPLOAD = "http://localhost:8000/api/upload-receipt"
-API_CLAIMS = "http://localhost:8000/api/claims"
-API_UPDATE = "http://localhost:8000/api/update-claim"
+API_UPLOAD = "http://backend-api:8000/api/upload-receipt"
+API_CLAIMS = "http://backend-api:8000/api/claims"
+API_UPDATE = "http://backend-api:8000/api/update-claim"
 
 st.set_page_config(page_title="AI Expense Auditor", page_icon="🧾", layout="wide")
 
@@ -137,7 +137,7 @@ if view_mode == "Employee Portal" or not st.session_state.is_admin:
         with tab_history:
             st.subheader("Your Submission History")
             try:
-                res = requests.get(f"http://localhost:8000/api/my-claims/{st.session_state.employee_id}")
+                res = requests.get(f"http://backend-api:8000/api/my-claims/{st.session_state.employee_id}")
                 if res.status_code == 200:
                     user_claims = res.json().get("claims", [])
                     if not user_claims:
