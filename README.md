@@ -54,7 +54,7 @@ This project is an **AI-powered Expense Auditing System** that automates the ver
     ### 🏢 Phase 1: The Employee Portal (Submission)
     1. **Upload:** Employees upload a sample receipt (Image or PDF) via the Streamlit interface.
     2. **Justification:** Users provide a business reason for the expense.
-    3. **AI Audit:** The system triggers Gemini 1.5 Flash to extract data and apply corporate policy rules.
+    3. **AI Audit:** The system triggers Gemini 2.5 Flash to extract data and apply corporate policy rules.
     4. **Instant Status:** The claim is instantly categorized as **APPROVED**, **REJECTED**, or **FLAGGED_FOR_REVIEW**.
 
     ### 🛡️ Phase 2: Human-in-the-Loop Override (Audit)
