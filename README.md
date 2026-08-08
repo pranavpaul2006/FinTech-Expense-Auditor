@@ -32,7 +32,7 @@ This project is an **AI-powered Expense Auditing System** that automates the ver
 ### 2. Local Development (Docker)
 1.  **Clone the Repository:**
     ```bash
-    git clone https://github.com/pranavpaul2006/FinTech-Expense-Auditor.git  
+    git clone https://github.com/pranavpaul2006/SpendGuard-AI.git  
     cd POLICY-AUDITOR  
     ```
 
