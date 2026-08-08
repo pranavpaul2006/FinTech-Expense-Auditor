@@ -1,4 +1,4 @@
-# FinTech Ai Expense Auditor
+# SpendGuard AI
 
 ## 🚩 The Problem
 Corporate expense policies are often dense, multi-page documents that are difficult for employees to navigate, leading to frequent non-compliance and rejected claims. Manual auditing of these receipts against complex rules is a high-latency process for finance departments, often resulting in human error and reimbursement delays.
